@@ -49,7 +49,7 @@ const getIAMAuthHeaders = async (APIURL, region, data) => {
 }
 
 
-appsyncRealtime(APIURL).subscription(({connect, data}) => getIAMAuthHeaders(APIURL + (connect ? "/connect" : ""), APIREGION, data))(`subscription MySubscription {
+appsyncRealtime({APIURL}).subscription(({connect, data}) => getIAMAuthHeaders(APIURL + (connect ? "/connect" : ""), APIREGION, data))(`subscription MySubscription {
   singleton {
     data
     last_updated

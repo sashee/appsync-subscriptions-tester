@@ -1,11 +1,11 @@
 import { appsyncRealtime } from "./lib.js";
-import {WebSocketServer} from "ws";
+import WebSocket, {WebSocketServer} from "ws";
 import { generateCert } from "./testcert.js";
 import {createServer} from "node:https";
 import getPort from "get-port";
 import {describe, it, test, mock} from "node:test";
-import {lastValueFrom, Subject, merge, of, EMPTY, from, ReplaySubject, firstValueFrom} from "rxjs";
-import {filter, first, switchMap, shareReplay, debounceTime, startWith, share, map, catchError, isEmpty, sequenceEqual, tap, skip, take, mergeMap} from "rxjs/operators";
+import {lastValueFrom, of, from, ReplaySubject, firstValueFrom} from "rxjs";
+import {filter, first, shareReplay, map, catchError, sequenceEqual, skip, mergeMap} from "rxjs/operators";
 import _ from "lodash";
 import assert from "node:assert/strict";
 import {setTimeout} from "node:timers/promises";
@@ -45,7 +45,7 @@ const withTestSetup = (connectionRetryConfig) => async (fn) => {
 
 	server.listen(port);
 	
-	const tester = appsyncRealtime(`https://127.0.0.1:${port}`, connectionRetryConfig);
+	const tester = appsyncRealtime({APIURL: `https://127.0.0.1:${port}`, connectionRetryConfig, WebSocketCtor: WebSocket});
 
 	try {
 		return await fn({tester, connections});
@@ -142,7 +142,6 @@ const handleConnections = ({connections, newConnection, newSubscription, disable
 const equalityCheck = (source, expected) => {
 	return lastValueFrom(source.pipe(
 		map((v) => ({type: "data", payload: v})),
-		//tap({next: (e) => console.log("data", e), error: (e) => console.error("error", e)}),
 		catchError((e) => of({type: "error", payload: e})),
 		sequenceEqual(from(expected), (a, b) => {
 			return Object.entries(a).every(([k,v]) => !b[k] || _.isEqual(b[k], v));
@@ -153,7 +152,7 @@ const equalityCheck = (source, expected) => {
 describe("connection", () => {
 	it("emits an error if failed", async () => {
 		const port = await getPort();
-		const tester = appsyncRealtime(`https://127.0.0.1:${port}`).subscription(() => null)(`subscription MySubscription {
+		const tester = appsyncRealtime({APIURL: `https://127.0.0.1:${port}`, WebSocketCtor: WebSocket}).subscription(() => null)(`subscription MySubscription {
 				singleton {
 					data
 					last_updated

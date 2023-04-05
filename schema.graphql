@@ -1,0 +1,38 @@
+type Item {
+	data: String!
+	timestamp: AWSDateTime!
+}
+
+type ItemConnection {
+	items: [Item!]!
+	nextToken: String
+}
+
+type Singleton {
+	data: String!
+	last_updated: AWSDateTime!
+}
+
+type Subscription {
+	singleton: Singleton
+	@aws_subscribe(mutations: ["updateSingleton"])
+	newItem: Item
+	@aws_subscribe(mutations: ["addNewItem"])
+}
+
+type Mutation {
+	addNewItem(data: String!): Item!
+	updateSingleton(data: String!): Singleton!
+	invalidate: String
+}
+
+type Query {
+	itemList(nextToken: String): ItemConnection!
+	singleton: Singleton!
+}
+
+schema {
+	query: Query
+	mutation: Mutation
+	subscription: Subscription
+}

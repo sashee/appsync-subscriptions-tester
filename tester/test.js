@@ -5,7 +5,7 @@ import {createServer} from "node:https";
 import getPort from "get-port";
 import {describe, it, test, mock} from "node:test";
 import {lastValueFrom, of, from, ReplaySubject, firstValueFrom} from "rxjs";
-import {filter, first, shareReplay, map, catchError, sequenceEqual, skip, mergeMap} from "rxjs/operators";
+import {filter, first, shareReplay, map, catchError, sequenceEqual, skip, mergeMap, tap} from "rxjs/operators";
 import _ from "lodash";
 import assert from "node:assert/strict";
 import {setTimeout} from "node:timers/promises";
@@ -32,12 +32,14 @@ const withTestSetup = (connectionRetryConfig) => async (fn) => {
 	wss.on("connection", (ws, req) => {
 		const connectionSubject = new ReplaySubject();
 		ws.on("error", (e) => connectionSubject.next({type: "error", error: e}));
-		ws.on("message", (m) => connectionSubject.next({type: "message", message: JSON.parse(Buffer.from(m, "utf8").toString())}));
+		ws.on("message", (m) => {
+			connectionSubject.next({type: "message", message: JSON.parse(Buffer.from(m, "utf8").toString())});
+		});
 		ws.on("open", () => connectionSubject.next({type: "open"}));
 		ws.on("close", () => connectionSubject.complete());
 
 		const send = (message) => {
-		ws.send(JSON.stringify(message))
+			ws.send(JSON.stringify(message));
 		}
 
 		connections.next({connectionSubject, send, url: req.url, ws});
@@ -152,7 +154,7 @@ const equalityCheck = (source, expected) => {
 describe("connection", () => {
 	it("emits an error if failed", async () => {
 		const port = await getPort();
-		const tester = appsyncRealtime({APIURL: `https://127.0.0.1:${port}`, WebSocketCtor: WebSocket}).subscription(() => null)(`subscription MySubscription {
+		const tester = appsyncRealtime({APIURL: `https://127.0.0.1:${port}`, WebSocketCtor: WebSocket}).subscription(() => ({auth: "header"}))(`subscription MySubscription {
 				singleton {
 					data
 					last_updated
@@ -533,6 +535,66 @@ describe("auth headears", () => {
 			await setTimeout(150);
 			assert.equal(newConnection.mock.callCount(), 1);
 			assert.equal(newSubscription.mock.callCount(), 0);
+		});
+	});
+	it("emits an error if the auth headers can not be retrieved for the connection", async () => {
+		return withTestSetup()(async ({tester, connections}) => {
+			handleConnections({
+				connections,
+			});
+			const subs = tester.subscription(({connect}) => Promise.reject(), {maxAttempts: 1})(`subscription MySubscription {
+				singleton {
+					data
+					last_updated
+				}
+			}
+			`, {});
+			assert(await equalityCheck(subs, [{type: "error"}]));
+		});
+	});
+	it("emits an error if the auth headers can not be retrieved for the subscription", async () => {
+		return withTestSetup()(async ({tester, connections}) => {
+			handleConnections({
+				connections,
+			});
+			const subs = tester.subscription(({connect}) => connect ? Promise.resolve({test: "headers"}) : Promise.reject(), {maxAttempts: 1})(`subscription MySubscription {
+				singleton {
+					data
+					last_updated
+				}
+			}
+			`, {});
+			assert(await equalityCheck(subs, [{type: "error"}]));
+		});
+	});
+	it("emits an error if the auth headers for the connection take too long to generate", async () => {
+		return withTestSetup()(async ({tester, connections}) => {
+			handleConnections({
+				connections,
+			});
+			const subs = tester.subscription(({connect}) => setTimeout(200).then(() => Promise.reject()), {maxAttempts: 1, timeout: 100})(`subscription MySubscription {
+				singleton {
+					data
+					last_updated
+				}
+			}
+			`, {});
+			assert(await equalityCheck(subs, [{type: "error"}]));
+		});
+	});
+	it("emits an error if the auth headers for the connection take too long to generate", async () => {
+		return withTestSetup()(async ({tester, connections}) => {
+			handleConnections({
+				connections,
+			});
+			const subs = tester.subscription(({connect}) => connect ? Promise.resolve({test: "headers"}) : setTimeout(200).then(() => Promise.reject()), {maxAttempts: 1, timeout: 100})(`subscription MySubscription {
+				singleton {
+					data
+					last_updated
+				}
+			}
+			`, {});
+			assert(await equalityCheck(subs, [{type: "error"}]));
 		});
 	});
 });

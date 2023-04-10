@@ -50,7 +50,7 @@ const updatesToBadges = (connection) => ({getAuthorizationHeaders, subscriptionR
 					cache: [...cache, ...newItems].filter((item) => !stopUpdatesForItem(item)),
 					emit: newItems,
 				};
-			}, {cache: {}, emit: []}),
+			}, {cache: [], emit: []}),
 			map(({emit}) => emit),
 			filter((items) => items.length > 0),
 		);
@@ -115,4 +115,3 @@ updatesToBadges(connection)({
 		error: (e) => console.error("badge error", e),
 		complete: () => console.log("badge complete"),
 	}));
-

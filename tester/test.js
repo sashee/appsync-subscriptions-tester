@@ -1,21 +1,33 @@
-import { appsyncRealtime } from "./lib.js";
+import { appsyncRealtime, persistentSubscription } from "./lib.js";
 import WebSocket, {WebSocketServer} from "ws";
 import { generateCert } from "./testcert.js";
 import {createServer} from "node:https";
 import getPort from "get-port";
 import {describe, it, test, mock} from "node:test";
-import {lastValueFrom, of, from, ReplaySubject, firstValueFrom} from "rxjs";
-import {filter, first, shareReplay, map, catchError, sequenceEqual, skip, mergeMap, tap} from "rxjs/operators";
+import {lastValueFrom, of, from, ReplaySubject, firstValueFrom, Subject} from "rxjs";
+import {filter, first, shareReplay, map, catchError, sequenceEqual, mergeMap, tap, take, skip} from "rxjs/operators";
 import _ from "lodash";
 import assert from "node:assert/strict";
 import {setTimeout} from "node:timers/promises";
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 
+const debug = false;
+
 process.on("uncaughtException", function (err) {
 	console.error("UNCAUGHT ERROR", err.message);
 	console.error(err);
 });
+
+const subscriptionQuery = `subscription MySubscription {
+	singleton {
+		data
+		last_updated
+	}
+}
+`;
+
+const subscriptionVariables = {};
 
 const withTestSetup = (connectionRetryConfig) => async (fn) => {
 	const port = await getPort();
@@ -39,8 +51,15 @@ const withTestSetup = (connectionRetryConfig) => async (fn) => {
 		ws.on("close", () => connectionSubject.complete());
 
 		const send = (message) => {
+			debug && (console.log("[tester] ws.send", message));
 			ws.send(JSON.stringify(message));
-		}
+		};
+		debug && (console.log("[tester] new connectionSubject"));
+		debug && (connectionSubject.subscribe(({
+			next: (e) => console.log("[tester] connectionSubject.next", e),
+			error: (e) => console.log("[tester] connectionSubject.error", e),
+			complete: () => console.log("[tester] connectionSubject.complete"),
+		})));
 
 		connections.next({connectionSubject, send, url: req.url, ws});
 	});
@@ -154,13 +173,7 @@ const equalityCheck = (source, expected) => {
 describe("connection", () => {
 	it("emits an error if failed", async () => {
 		const port = await getPort();
-		const tester = appsyncRealtime({APIURL: `https://127.0.0.1:${port}`, WebSocketCtor: WebSocket}).subscription(() => ({auth: "header"}))(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+		const tester = appsyncRealtime({APIURL: `https://127.0.0.1:${port}`, WebSocketCtor: WebSocket})({getAuthorizationHeaders: () => ({auth: "header"})})(subscriptionQuery, subscriptionVariables);
 
 		assert(await equalityCheck(tester, [{type: "error"}]));
 	});
@@ -171,13 +184,7 @@ describe("connection", () => {
 				connections,
 			});
 			sendMessageToConnection(0, {type: "error", payload: "test error"});
-			const subs = tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, [{type: "error", payload: "test error"}]));
 		});
 	});
@@ -188,13 +195,7 @@ describe("connection", () => {
 				disableAutoAckConnection: true,
 				connections,
 			});
-			const subs = tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, [{type: "error"}]));
 		});
 	});
@@ -213,13 +214,7 @@ describe("connection", () => {
 					}
 				},
 			});
-			const subs = tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, [{type: "data", payload: "success"}]));
 		});
 	});
@@ -235,13 +230,7 @@ describe("connection", () => {
 					ws.close();
 				}
 			});
-			const subs = tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, [{type: "data", payload: "success"}]));
 		});
 	});
@@ -256,13 +245,7 @@ describe("connection", () => {
 					sendMessageToConnection(0, {type: "connection_ack", payload: {connectionTimeoutMs: 100}});
 				}
 			});
-			const subs = tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, []));
 		});
 	});
@@ -289,13 +272,7 @@ describe("connection", () => {
 					shouldFinish = true;
 				}
 			});
-			const subs = tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, []));
 			assert(shouldFinish);
 		});
@@ -319,23 +296,11 @@ describe("connection", () => {
 			});
 			const subs1 = new ReplaySubject();
 			const subs2 = new ReplaySubject();
-			tester.subscription(() => ({subscription: "1"}))(`subscription MySubscription1 {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {}).subscribe(subs1);
+			tester({getAuthorizationHeaders: () => ({subscription: "1"})})(subscriptionQuery, subscriptionVariables).subscribe(subs1);
 			sendMessageToSubscription(0, 0, {type: "data", payload: {data: "result"}});
 			await setTimeout(100);
 			assert.equal(newSubscription.mock.callCount(), 1);
-			tester.subscription(() => ({subscription: "2"}))(`subscription MySubscription2 {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {}).subscribe(subs2);
+			tester({getAuthorizationHeaders: () => ({subscription: "2"})})(subscriptionQuery, subscriptionVariables).subscribe(subs2);
 			await setTimeout(100);
 			sendMessageToSubscription(0, 0, {type: "complete"});
 			sendMessageToSubscription(0, 1, {type: "complete"});
@@ -356,13 +321,7 @@ describe("connection", () => {
 				newConnection,
 			});
 			const subs1 = new ReplaySubject();
-			tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {}).subscribe(subs1);
+			tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables).subscribe(subs1);
 			await waitForConnection(0);
 			sendMessageToSubscription(0, 0, {type: "complete"});
 			// connection is complete
@@ -380,25 +339,13 @@ describe("connection", () => {
 				newConnection,
 			});
 			const subs1 = new ReplaySubject();
-			tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {}).subscribe(subs1);
+			tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables).subscribe(subs1);
 			await waitForConnection(0);
 			sendMessageToSubscription(0, 0, {type: "complete"});
 			assert.equal(newConnection.mock.callCount(), 1);
 			await lastValueFrom(connection);
 			const subs2 = new ReplaySubject();
-			tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {}).subscribe(subs2);
+			tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables).subscribe(subs2);
 			await waitForConnection(1);
 			sendMessageToSubscription(1, 0, {type: "complete"});
 			assert.equal(newConnection.mock.callCount(), 2);
@@ -428,13 +375,7 @@ describe("auth headears", () => {
 				newConnection,
 				newSubscription,
 			})
-			const subs = tester.subscription(({connect, data}) => ({test: "authheader", connect, data}))(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: ({connect, data}) => ({test: "authheader", connect, data})})(subscriptionQuery, subscriptionVariables);
 			sendMessageToSubscription(0, 0, {type: "complete"});
 			assert(await equalityCheck(subs, []));
 			assert.equal(newConnection.mock.callCount(), 1);
@@ -461,13 +402,7 @@ describe("auth headears", () => {
 				newConnection,
 				newSubscription,
 			})
-			const subs = tester.subscription(({connect, data}) => ({test: "authheader", connect, data}))(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: ({connect, data}) => ({test: "authheader", connect, data})})(subscriptionQuery, subscriptionVariables);
 			sendMessageToSubscription(0, 0, {type: "complete"});
 			assert(await equalityCheck(subs, []));
 
@@ -483,13 +418,7 @@ describe("auth headears", () => {
 			newSubscription.mock.mockImplementation(({payload, connectionNum, subscriptionNum}) => {
 				assert.deepStrictEqual(payload.extensions, {authorization: {test: "authheader2", connect: false, data: JSON.parse(payload.data)}});
 			});
-			const subs2 = tester.subscription(({connect, data}) => ({test: "authheader2", connect, data}))(`subscription MySubscription2 {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs2 = tester({getAuthorizationHeaders: ({connect, data}) => ({test: "authheader2", connect, data})})(subscriptionQuery, subscriptionVariables);
 			sendMessageToSubscription(1, 0, {type: "complete"});
 			assert(await equalityCheck(subs2, []));
 		});
@@ -501,13 +430,7 @@ describe("auth headears", () => {
 				connections,
 				newConnection,
 			});
-			const subs = tester.subscription(() => setTimeout(200).then(() => ({auth: "1"})))(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {}).subscribe({next: (e) => console.log(e)});
+			const subs = tester({getAuthorizationHeaders: () => setTimeout(200).then(() => ({auth: "1"}))})(subscriptionQuery, subscriptionVariables).subscribe({next: (e) => console.log(e)});
 			await setTimeout(100);
 			subs.unsubscribe();
 			await setTimeout(150);
@@ -523,13 +446,7 @@ describe("auth headears", () => {
 				newConnection,
 				newSubscription,
 			});
-			const subs = tester.subscription(({connect}) => setTimeout(connect ? 0 : 200).then(() => ({auth: "1"})))(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {}).subscribe({next: (e) => console.log(e)});
+			const subs = tester({getAuthorizationHeaders: ({connect}) => setTimeout(connect ? 0 : 200).then(() => ({auth: "1"}))})(subscriptionQuery, subscriptionVariables).subscribe({next: (e) => console.log(e)});
 			await setTimeout(100);
 			subs.unsubscribe();
 			await setTimeout(150);
@@ -542,13 +459,7 @@ describe("auth headears", () => {
 			handleConnections({
 				connections,
 			});
-			const subs = tester.subscription(({connect}) => Promise.reject(), {maxAttempts: 1})(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: ({connect}) => Promise.reject(), subscriptionRetryConfig: {maxAttempts: 1}})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, [{type: "error"}]));
 		});
 	});
@@ -557,13 +468,7 @@ describe("auth headears", () => {
 			handleConnections({
 				connections,
 			});
-			const subs = tester.subscription(({connect}) => connect ? Promise.resolve({test: "headers"}) : Promise.reject(), {maxAttempts: 1})(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: ({connect}) => connect ? Promise.resolve({test: "headers"}) : Promise.reject(), subscriptionRetryConfig: {maxAttempts: 1}})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, [{type: "error"}]));
 		});
 	});
@@ -572,13 +477,7 @@ describe("auth headears", () => {
 			handleConnections({
 				connections,
 			});
-			const subs = tester.subscription(({connect}) => setTimeout(200).then(() => Promise.reject()), {maxAttempts: 1, timeout: 100})(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: ({connect}) => setTimeout(200).then(() => Promise.reject()), subscriptionRetryConfig: {maxAttempts: 1, timeout: 100}})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, [{type: "error"}]));
 		});
 	});
@@ -587,13 +486,7 @@ describe("auth headears", () => {
 			handleConnections({
 				connections,
 			});
-			const subs = tester.subscription(({connect}) => connect ? Promise.resolve({test: "headers"}) : setTimeout(200).then(() => Promise.reject()), {maxAttempts: 1, timeout: 100})(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: ({connect}) => connect ? Promise.resolve({test: "headers"}) : setTimeout(200).then(() => Promise.reject()), subscriptionRetryConfig: {maxAttempts: 1, timeout: 100}})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, [{type: "error"}]));
 		});
 	});
@@ -606,13 +499,7 @@ describe("subscription", () => {
 				disableAutoAckSubscription: true,
 				connections,
 			});
-			const subs = tester.subscription(() => null, undefined, {maxAttempts: 1, timeout: 50})(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null, subscriptionRetryConfig: {maxAttempts: 1, timeout: 50}})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, [{type: "error"}]));
 		});
 	});
@@ -630,13 +517,7 @@ describe("subscription", () => {
 					}
 				},
 			});
-			const subs = tester.subscription(() => null, undefined, {maxAttempts:3, timeout: 50})(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null, subscriptionRetryConfig: {maxAttempts:3, timeout: 50}})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, [{type: "data", payload: "success"}]));
 		});
 	});
@@ -657,13 +538,7 @@ describe("subscription", () => {
 					}
 				},
 			});
-			const subs = tester.subscription(() => null, undefined, {maxAttempts:3, timeout: 200})(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null, subscriptionRetryConfig: {maxAttempts:3, timeout: 200}})(subscriptionQuery, subscriptionVariables);
 			await Promise.race([
 				(async () => assert(await equalityCheck(subs, [{type: "data", payload: "success"}])))(),
 				setTimeout(100).then(() => {throw new Error("Should have finished already")}),
@@ -676,13 +551,7 @@ describe("subscription", () => {
 			const {sendMessageToSubscription} = handleConnections({
 				connections,
 			});
-			const subs = tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables);
 			sendMessageToSubscription(0, 0, {type: "data", payload: {data: "result"}});
 			sendMessageToSubscription(0, 0, {type: "complete"});
 			assert(await equalityCheck(subs, [{type: "data", payload: {data: "result"}}]));
@@ -694,13 +563,7 @@ describe("subscription", () => {
 				connections,
 			});
 			const complete = mock.fn(() => {});
-			const subs = tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {}).pipe(shareReplay());
+			const subs = tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables).pipe(shareReplay());
 			subs.subscribe(({
 				complete,
 			}));
@@ -716,13 +579,7 @@ describe("subscription", () => {
 				connections,
 			});
 			const error = mock.fn((e) => {});
-			const subs = tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {}).pipe(shareReplay());
+			const subs = tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables).pipe(shareReplay());
 			subs.subscribe(({
 				error,
 			}));
@@ -745,13 +602,7 @@ describe("subscription", () => {
 					}));
 				},
 			});
-			const subs = tester.subscription(() => null)(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {}).subscribe(({
+			const subs = tester({getAuthorizationHeaders: () => null})(subscriptionQuery, subscriptionVariables).subscribe(({
 				next: (e) => console.log(e),
 			}));
 			await setTimeout(100);
@@ -775,15 +626,43 @@ describe("subscription", () => {
 					sendMessageToSubscription(0, 0, {type: "complete"});
 				},
 			});
-			const subs = tester.subscription(() => null, opened, {})(`subscription MySubscription {
-				singleton {
-					data
-					last_updated
-				}
-			}
-			`, {});
+			const subs = tester({getAuthorizationHeaders: () => null, opened})(subscriptionQuery, subscriptionVariables);
 			assert(await equalityCheck(subs, []));
 		});
 	});
 });
 
+describe("persistentSubscription", () => {
+	it("reconnects automatically if the connection is closed", async () => {
+		return withTestSetup({maxAttempts: 1, timeout: 50})(async ({tester, connections}) => {
+			const opened = new Subject();
+			handleConnections({
+				connections,
+				newConnection: async ({ws}) => {
+					opened.pipe(take(1)).subscribe(async () => {
+						ws.close();
+					});
+				},
+			});
+			const subs = persistentSubscription(tester)({closed: (e) => console.log("closed", e), getAuthorizationHeaders: () => null, subscriptionRetryConfig: {maxAttempts: 1}, opened: () => opened.next(), reopenTimeoutOnComplete: 10, reopenTimeoutOnError: 10})(subscriptionQuery, subscriptionVariables).subscribe(() => {});
+			await firstValueFrom(connections.pipe(skip(2), take(1)));
+			subs.unsubscribe();
+		});
+	});
+	it("reconnects automatically if the connection has an error", async () => {
+		return withTestSetup({maxAttempts: 1, timeout: 50})(async ({tester, connections}) => {
+			const opened = new Subject();
+			const {sendMessageToConnection} = handleConnections({
+				connections,
+				newConnection: async ({connectionNum}) => {
+					opened.pipe(take(1)).subscribe(async () => {
+						sendMessageToConnection(connectionNum, {type: "error"});
+					});
+				},
+			});
+			const subs = persistentSubscription(tester)({closed: (e) => console.log("closed", e), getAuthorizationHeaders: () => null, subscriptionRetryConfig: {maxAttempts: 1}, opened: () => opened.next(), reopenTimeoutOnComplete: 10, reopenTimeoutOnError: 10})(subscriptionQuery, subscriptionVariables).subscribe(() => {});
+			await firstValueFrom(connections.pipe(skip(2), take(1)));
+			subs.unsubscribe();
+		});
+	});
+});

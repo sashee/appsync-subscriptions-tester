@@ -1,34 +1,51 @@
-type Item {
-	data: String!
-	timestamp: AWSDateTime!
-}
-
-type ItemConnection {
-	items: [Item!]!
-	nextToken: String
-}
-
-type Singleton {
-	data: String!
+type Door {
+	open: Boolean!
 	last_updated: AWSDateTime!
 }
 
+type Temperature {
+	value: Float!
+	timestamp: AWSDateTime!
+}
+
+type TemperatureConnection {
+	items: [Temperature!]!
+	nextToken: String
+}
+
+type Badge {
+	id: ID!
+	issued_at: AWSDateTime!
+	returned_at: AWSDateTime
+	last_updated: AWSDateTime!
+	use_count: Int!
+}
+
+type BadgeConnection {
+	items: [Badge!]!
+	nextToken: String
+}
+
 type Subscription {
-	singleton: Singleton
-	@aws_subscribe(mutations: ["updateSingleton"])
-	newItem: Item
-	@aws_subscribe(mutations: ["addNewItem"])
+	door: Door
+	@aws_subscribe(mutations: ["updateDoor"])
+	temperature: Temperature
+	@aws_subscribe(mutations: ["registerTemperature"])
+	badge: Badge
+	@aws_subscribe(mutations: ["updateBadge"])
 }
 
 type Mutation {
-	addNewItem(data: String!): Item!
-	updateSingleton(data: String!): Singleton!
+	updateDoor(open: Boolean!): Door!
+	registerTemperature(value: Float!): Temperature!
+	updateBadge(id: ID, return_badge: Boolean, increment_uses: Boolean): Badge!
 	invalidate: String
 }
 
 type Query {
-	itemList(nextToken: String): ItemConnection!
-	singleton: Singleton!
+	temperatures(nextToken: String): TemperatureConnection!
+	door: Door!
+	badges(onlyActive: Boolean!, nextToken: String): BadgeConnection!
 }
 
 schema {

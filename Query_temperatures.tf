@@ -1,7 +1,7 @@
-resource "aws_appsync_function" "Query_itemList_1" {
+resource "aws_appsync_function" "Query_temperatures_1" {
   api_id      = aws_appsync_graphql_api.appsync.id
-  data_source = aws_appsync_datasource.items.name
-  name        = "Query_itemList_1"
+  data_source = aws_appsync_datasource.temperature.name
+  name        = "Query_temperatures_1"
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -35,10 +35,10 @@ export function response(ctx) {
 }
 EOF
 }
-resource "aws_appsync_resolver" "Query_itemList" {
+resource "aws_appsync_resolver" "Query_temperatures" {
   api_id = aws_appsync_graphql_api.appsync.id
   type   = "Query"
-  field  = "itemList"
+  field  = "temperatures"
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -54,7 +54,7 @@ EOF
   kind = "PIPELINE"
   pipeline_config {
     functions = [
-      aws_appsync_function.Query_itemList_1.function_id,
+      aws_appsync_function.Query_temperatures_1.function_id,
     ]
   }
 }

@@ -1,7 +1,7 @@
-resource "aws_appsync_function" "Mutation_addNewItem_1" {
+resource "aws_appsync_function" "Mutation_registerTemperature_1" {
   api_id      = aws_appsync_graphql_api.appsync.id
-  data_source = aws_appsync_datasource.items.name
-  name        = "Mutation_addNewItem_1"
+  data_source = aws_appsync_datasource.temperature.name
+  name        = "Mutation_registerTemperature_1"
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -17,7 +17,7 @@ export function request(ctx) {
 		},
 		attributeValues: {
 			timestamp: {S: util.time.nowISO8601()},
-			data: {S: ctx.args.data}
+			value: {N: ctx.args.value}
 		}
 	};
 }
@@ -29,10 +29,10 @@ export function response(ctx) {
 }
 EOF
 }
-resource "aws_appsync_resolver" "Mutation_addNewItem" {
+resource "aws_appsync_resolver" "Mutation_registerTemperature" {
   api_id = aws_appsync_graphql_api.appsync.id
   type   = "Mutation"
-  field  = "addNewItem"
+  field  = "registerTemperature"
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -48,7 +48,7 @@ EOF
   kind = "PIPELINE"
   pipeline_config {
     functions = [
-      aws_appsync_function.Mutation_addNewItem_1.function_id,
+      aws_appsync_function.Mutation_registerTemperature_1.function_id,
     ]
   }
 }

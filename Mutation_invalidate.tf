@@ -10,14 +10,21 @@ request_mapping_template = <<EOF
 EOF
 response_mapping_template = <<EOF
 $extensions.invalidateSubscriptions({
-	"subscriptionField": "newItem",
+	"subscriptionField": "door",
 	"payload": {
 		"a": "1"
 	}
 })
 
 $extensions.invalidateSubscriptions({
-	"subscriptionField": "singleton",
+	"subscriptionField": "temperature",
+	"payload": {
+		"a": "1"
+	}
+})
+
+$extensions.invalidateSubscriptions({
+	"subscriptionField": "badge",
 	"payload": {
 		"a": "1"
 	}

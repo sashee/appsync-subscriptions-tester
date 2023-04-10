@@ -1,7 +1,7 @@
-resource "aws_appsync_function" "Subscription_singleton_1" {
+resource "aws_appsync_function" "Subscription_badge_1" {
   api_id      = aws_appsync_graphql_api.appsync.id
   data_source = aws_appsync_datasource.none.name
-  name        = "Subscription_singleton_1"
+  name        = "Subscription_badge_1"
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -32,10 +32,10 @@ export function response(ctx) {
 }
 EOF
 }
-resource "aws_appsync_resolver" "Subscription_singleton" {
+resource "aws_appsync_resolver" "Subscription_badge" {
   api_id = aws_appsync_graphql_api.appsync.id
   type   = "Subscription"
-  field  = "singleton"
+  field  = "badge"
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -51,7 +51,7 @@ EOF
   kind = "PIPELINE"
   pipeline_config {
     functions = [
-      aws_appsync_function.Subscription_singleton_1.function_id,
+      aws_appsync_function.Subscription_badge_1.function_id,
     ]
   }
 }

@@ -29,8 +29,10 @@ data "aws_iam_policy_document" "appsync" {
       "dynamodb:Query",
     ]
     resources = [
-      aws_dynamodb_table.items.arn,
-      aws_dynamodb_table.singleton.arn,
+      aws_dynamodb_table.door.arn,
+      aws_dynamodb_table.temperature.arn,
+      aws_dynamodb_table.badge.arn,
+      "${aws_dynamodb_table.badge.arn}/*",
     ]
   }
 }
@@ -82,23 +84,33 @@ resource "aws_cloudwatch_log_group" "loggroup" {
   name              = "/aws/appsync/apis/${aws_appsync_graphql_api.appsync.id}"
   retention_in_days = 14
 }
-resource "aws_appsync_datasource" "items" {
+resource "aws_appsync_datasource" "temperature" {
   api_id           = aws_appsync_graphql_api.appsync.id
-  name             = "items"
+  name             = "temperature"
   service_role_arn = aws_iam_role.appsync.arn
   type             = "AMAZON_DYNAMODB"
   dynamodb_config {
-    table_name = aws_dynamodb_table.items.name
+    table_name = aws_dynamodb_table.temperature.name
   }
 }
 
-resource "aws_appsync_datasource" "singleton" {
+resource "aws_appsync_datasource" "door" {
   api_id           = aws_appsync_graphql_api.appsync.id
-  name             = "singleton"
+  name             = "door"
   service_role_arn = aws_iam_role.appsync.arn
   type             = "AMAZON_DYNAMODB"
   dynamodb_config {
-    table_name = aws_dynamodb_table.singleton.name
+    table_name = aws_dynamodb_table.door.name
+  }
+}
+
+resource "aws_appsync_datasource" "badge" {
+  api_id           = aws_appsync_graphql_api.appsync.id
+  name             = "badge"
+  service_role_arn = aws_iam_role.appsync.arn
+  type             = "AMAZON_DYNAMODB"
+  dynamodb_config {
+    table_name = aws_dynamodb_table.badge.name
   }
 }
 

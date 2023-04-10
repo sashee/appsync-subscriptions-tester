@@ -1,7 +1,7 @@
-resource "aws_appsync_function" "Query_singleton_1" {
+resource "aws_appsync_function" "Subscription_temperature_1" {
   api_id      = aws_appsync_graphql_api.appsync.id
-  data_source = aws_appsync_datasource.singleton.name
-  name        = "Query_singleton_1"
+  data_source = aws_appsync_datasource.none.name
+  name        = "Subscription_temperature_1"
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -11,25 +11,31 @@ import {util} from "@aws-appsync/utils";
 export function request(ctx) {
 	return {
 		version : "2018-05-29",
-		operation : "GetItem",
-		key: {
-			id: {S: "1"}
-		},
-		consistentRead: true,
 	};
 }
 export function response(ctx) {
 	if (ctx.error) {
 		return util.error(ctx.error.message, ctx.error.type);
 	}
+	extensions.setSubscriptionInvalidationFilter({
+		filterGroup: [{
+			filters: [
+				{
+					fieldName: "a",
+					"operator": "eq",
+					"value": "1"
+				}
+			]
+		}]
+	});
 	return ctx.result;
 }
 EOF
 }
-resource "aws_appsync_resolver" "Query_singleton" {
+resource "aws_appsync_resolver" "Subscription_temperature" {
   api_id = aws_appsync_graphql_api.appsync.id
-  type   = "Query"
-  field  = "singleton"
+  type   = "Subscription"
+  field  = "temperature"
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -45,7 +51,7 @@ EOF
   kind = "PIPELINE"
   pipeline_config {
     functions = [
-      aws_appsync_function.Query_singleton_1.function_id,
+      aws_appsync_function.Subscription_temperature_1.function_id,
     ]
   }
 }

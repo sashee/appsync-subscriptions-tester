@@ -1,7 +1,7 @@
-resource "aws_appsync_function" "Mutation_updateSingleton_1" {
+resource "aws_appsync_function" "Query_door_1" {
   api_id      = aws_appsync_graphql_api.appsync.id
-  data_source = aws_appsync_datasource.singleton.name
-  name        = "Mutation_updateSingleton_1"
+  data_source = aws_appsync_datasource.door.name
+  name        = "Query_door_1"
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -11,21 +11,11 @@ import {util} from "@aws-appsync/utils";
 export function request(ctx) {
 	return {
 		version : "2018-05-29",
-		operation : "UpdateItem",
+		operation : "GetItem",
 		key: {
 			id: {S: "1"}
 		},
-		update: {
-			expression: "SET #data = :data, #last_updated = :last_updated",
-			expressionNames: {
-				"#data": "data",
-				"#last_updated": "last_updated",
-			},
-			expressionValues: {
-				":data": {S: ctx.args.data},
-				":last_updated": {S: util.time.nowISO8601()},
-			}
-		}
+		consistentRead: true,
 	};
 }
 export function response(ctx) {
@@ -36,10 +26,10 @@ export function response(ctx) {
 }
 EOF
 }
-resource "aws_appsync_resolver" "Mutation_updateSingleton" {
+resource "aws_appsync_resolver" "Query_door" {
   api_id = aws_appsync_graphql_api.appsync.id
-  type   = "Mutation"
-  field  = "updateSingleton"
+  type   = "Query"
+  field  = "door"
   runtime {
     name            = "APPSYNC_JS"
     runtime_version = "1.0.0"
@@ -55,7 +45,7 @@ EOF
   kind = "PIPELINE"
   pipeline_config {
     functions = [
-      aws_appsync_function.Mutation_updateSingleton_1.function_id,
+      aws_appsync_function.Query_door_1.function_id,
     ]
   }
 }

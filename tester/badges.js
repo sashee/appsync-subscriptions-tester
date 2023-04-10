@@ -2,7 +2,7 @@ import {connection, sendQuery, persistentSubscription, getIAMAuthRequest, getPag
 import {Observable, Subject, of, from, defer, noop, ReplaySubject, merge} from "rxjs";
 import {tap, retry, map, count, mergeMap, mergeWith, scan, distinctUntilChanged, switchMap, filter, takeUntil, startWith, withLatestFrom, share, take} from "rxjs/operators";
 
-const updatesToBadges = (connection) => ({getAuthorizationHeaders, subscriptionRetryConfig, reopenTimeoutOnError, reopenTimeoutOnComplete, retryFetchDelay, subscription: {query, variables, extractItemFromSubscription}, fetchItems, extractLastUpdated, stopUpdatesForItem}) => {
+const updatesToBadges = (connection) => ({getAuthorizationHeaders, subscriptionRetryConfig, reopenTimeoutOnError, reopenTimeoutOnComplete, retryFetchDelay, subscription: {query, variables, extractItemFromSubscription}, fetchItems, extractLastUpdated, extractId, stopUpdatesForItem}) => {
 	const opened = new Subject();
 	const closed = new Subject();
 	const fetchedItems = new Subject();
@@ -43,19 +43,21 @@ const updatesToBadges = (connection) => ({getAuthorizationHeaders, subscriptionR
 			scan(({cache}, items) => {
 				const newItems = items.filter((item) => {
 					const lastUpdated = extractLastUpdated(item);
-					return cache.every((cacheItem) => lastUpdated.getTime() !== extractLastUpdated(cacheItem).getTime());
+					const id = extractId(item);
+					return cache.every((cacheItem) => extractId(cacheItem) !== id || lastUpdated.getTime() !== extractLastUpdated(cacheItem).getTime());
 				});
 				return {
 					cache: [...cache, ...newItems].filter((item) => !stopUpdatesForItem(item)),
 					emit: newItems,
 				};
-			}, {cache: [], emit: []}),
+			}, {cache: {}, emit: []}),
 			map(({emit}) => emit),
 			filter((items) => items.length > 0),
 		);
 };
 
 const extractLastUpdated = (item) => new Date(item.last_updated);
+const extractId = (item) => item.id;
 
 const stopUpdatesForItem = ({returned_at}) => returned_at !== null;
 
@@ -102,6 +104,7 @@ updatesToBadges(connection)({
 		return results;
 	},
 	extractLastUpdated,
+	extractId,
 	stopUpdatesForItem,
 })
 	.pipe(

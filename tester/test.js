@@ -14,6 +14,15 @@ process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 
 const debug = false;
 
+const debugTap = (label) => tap({
+	subscribe: () => console.log(`${label}.subscribe`),
+	next: (e) => console.log(`${label}.next`, e),
+	error: (e) => console.log(`${label}.error`, e),
+	complete: () => console.log(`${label}.complete`),
+	unsubscribe: () => console.log(`${label}.unsubscribe`),
+	finalize: () => console.log(`${label}.finalize`),
+});
+
 process.on("uncaughtException", function (err) {
 	console.error("UNCAUGHT ERROR", err.message);
 	console.error(err);

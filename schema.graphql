@@ -1,19 +1,19 @@
-type Door {
+type Door @aws_api_key @aws_iam {
 	open: Boolean!
 	last_updated: AWSDateTime!
 }
 
-type Temperature {
+type Temperature @aws_api_key @aws_iam {
 	value: Float!
 	timestamp: AWSDateTime!
 }
 
-type TemperatureConnection {
+type TemperatureConnection @aws_api_key @aws_iam {
 	items: [Temperature!]!
 	nextToken: String
 }
 
-type Badge {
+type Badge @aws_api_key @aws_iam {
 	id: ID!
 	issued_at: AWSDateTime!
 	returned_at: AWSDateTime
@@ -21,12 +21,12 @@ type Badge {
 	use_count: Int!
 }
 
-type BadgeConnection {
+type BadgeConnection @aws_api_key @aws_iam {
 	items: [Badge!]!
 	nextToken: String
 }
 
-type Subscription {
+type Subscription @aws_api_key @aws_iam {
 	door: Door
 	@aws_subscribe(mutations: ["updateDoor"])
 	temperature: Temperature
@@ -35,14 +35,14 @@ type Subscription {
 	@aws_subscribe(mutations: ["updateBadge"])
 }
 
-type Mutation {
+type Mutation @aws_iam {
 	updateDoor(open: Boolean!): Door!
 	registerTemperature(value: Float!): Temperature!
 	updateBadge(id: ID, return_badge: Boolean, increment_uses: Boolean): Badge!
 	invalidate: String
 }
 
-type Query {
+type Query @aws_api_key @aws_iam {
 	temperatures(nextToken: String): TemperatureConnection!
 	door: Door!
 	badges(onlyActive: Boolean!, nextToken: String): BadgeConnection!

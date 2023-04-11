@@ -44,11 +44,19 @@ resource "aws_appsync_graphql_api" "appsync" {
   name                = "subscriptions-tester"
   schema              = file("schema.graphql")
   authentication_type = "AWS_IAM"
+  additional_authentication_provider {
+    authentication_type = "API_KEY"
+  }
   log_config {
     cloudwatch_logs_role_arn = aws_iam_role.appsync_logs.arn
     field_log_level          = "ALL"
   }
 }
+
+resource "aws_appsync_api_key" "apikey" {
+  api_id  = aws_appsync_graphql_api.appsync.id
+}
+
 data "aws_iam_policy_document" "appsync_push_logs" {
   statement {
     actions = [

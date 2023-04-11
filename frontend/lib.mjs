@@ -1,4 +1,4 @@
-import {Observable, NEVER, ReplaySubject, pipe, timer} from "rxjs";
+import {Observable, NEVER, ReplaySubject, pipe} from "rxjs";
 import {webSocket} from "rxjs/webSocket";
 import {filter, debounceTime, startWith, take, timeout, retry, map, mergeMap, tap, withLatestFrom, first, takeUntil, count, share} from "rxjs/operators";
 import {Buffer} from "buffer";

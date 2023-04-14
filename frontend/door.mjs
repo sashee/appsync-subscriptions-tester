@@ -17,7 +17,7 @@ const updatesToDoor = (connection) => ({getAuthorizationHeaders, subscriptionRet
 			mergeWith(opened.pipe(
 				switchMap(() => defer(() => fetchItem())
 				.pipe(
-					retry({delay: retryFetchDelay ?? 5000}),
+					retry({delay: retryFetchDelay ?? 15000}),
 				)),
 			)),
 			scan((acc, value) =>
@@ -62,7 +62,7 @@ export const Door = () => {
 	const [subscriptionStatus, setSubscriptionStatus] = useState(false);
 	const [door, setDoor] = useState(undefined);
 
-	const [groundTruthFetchingEnabled, setGroundTruthFetchingEnabled] = useState(false);
+	const [groundTruthFetchingEnabled, setGroundTruthFetchingEnabled] = useState(true);
 	const [groundTruth, setGroundTruth] = useState({loading: false});
 
 	useEffect(() => {
@@ -106,26 +106,43 @@ export const Door = () => {
 	const secondsAgoFormat = new Intl.RelativeTimeFormat("en");
 
 	return html`
-		<div>
-			<div>Status: ${subscriptionStatus ? "ONLINE" : "OFFLINE"}</div>
-			${door === undefined ? html`<div>Initializing</div>` : html`
-				<div>${door.open ? "OPEN" : "CLOSE"}</div>
-				<div>${secondsAgoFormat.format(Math.round((new Date(door.last_updated).getTime() - currentTime.getTime()) / 1000), "second")}</div>
-			`} 
-			<div>Ground truth:
-				<label>
-					<input
-						type="checkbox"
-						checked=${groundTruthFetchingEnabled}
-						onChange=${() => setGroundTruthFetchingEnabled(!groundTruthFetchingEnabled)}
-					/>
-					Check ground truth
-				</label>
-				<div>${groundTruth.loading ? "LOADING" : "..."}</div>
-				${groundTruth.at && groundTruth.item && html`
-					<pre>${JSON.stringify(groundTruth.item, undefined, 4)}</pre>
-					<div>${secondsAgoFormat.format(Math.round((groundTruth.at.getTime() - currentTime.getTime()) / 1000), "second")}</div>
-				`}
+		<div class="container">
+			<div class="row">
+				<div class="col-md-4 offset-md-1">
+					<div class="card">
+						<div class="card-header d-flex justify-content-between">
+							Door status <div class="">${door === undefined ? "Initializing..." : subscriptionStatus ? "online" : "offline"}</div>
+						</div>
+						<div class="card-body">
+							<div>${door === undefined ? "Initializing..." : (door.open ? "Opened" : "Closed")}</div>
+						</div>
+						<div class="card-footer text-muted">
+							<div>Last change: ${door !== undefined ? secondsAgoFormat.format(Math.round((new Date(door.last_updated).getTime() - currentTime.getTime()) / 1000), "second") : "-"}</div>
+						</div>
+					</div>
+				</div>
+				<div class="col-md-4 offset-md-2">
+					<div class="card">
+						<div class="card-header d-flex justify-content-between">
+							<label>
+								<input
+									type="checkbox"
+									checked=${groundTruthFetchingEnabled}
+									onChange=${() => setGroundTruthFetchingEnabled(!groundTruthFetchingEnabled)}
+								/>
+								Check ground truth
+							</label>
+							<div class="">${groundTruth.loading ? "Fetching..." : ""}</div>
+						</div>
+						<div class="card-body ${!groundTruthFetchingEnabled ? "text-muted" : ""}">
+							<div>${groundTruth.item === undefined ? "-": groundTruth.item.open ? "Opened" : "Closed"}</div>
+							<div>Last change: ${groundTruth?.item?.last_updated !== undefined ? secondsAgoFormat.format(Math.round((new Date(groundTruth.item.last_updated).getTime() - currentTime.getTime()) / 1000), "second") : "-"}</div>
+						</div>
+						<div class="card-footer text-muted">
+							<div>Last fetched: ${groundTruth?.at !== undefined ? secondsAgoFormat.format(Math.round((new Date(groundTruth.at).getTime() - currentTime.getTime()) / 1000), "second") : "-"}</div>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 	`;

@@ -83,7 +83,7 @@ const updateTemperature = async () => {
     timestamp
     value
   }
-}`, "MyMutation", {value: lastTemp + Math.round((Math.random() * 2 - 1) * 100) / 100});
+}`, "MyMutation", {value: (lastTemp + Math.round((Math.random() * 2 - 1) * 100) / 100).toFixed(2)});
 };
 
 const getPaginatedResults = async (fn) => {

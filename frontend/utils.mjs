@@ -3,6 +3,24 @@ import {Observable, NEVER, ReplaySubject, pipe, timer} from "rxjs";
 
 const {APIKEY, APIURL} = window;
 
+export const getPaginatedResults = async (fn) => {
+	const EMPTY = Symbol("empty");
+	const res = [];
+	for await (const lf of (async function*() {
+		let NextMarker = EMPTY;
+		while (NextMarker || NextMarker === EMPTY) {
+			const {marker, results} = await fn(NextMarker !== EMPTY ? NextMarker : undefined);
+
+			yield* results;
+			NextMarker = marker;
+		}
+	})()) {
+		res.push(lf);
+	}
+
+	return res;
+};
+
 export const sendQuery = async (query, operationName, variables) => {
 	const url = new URL(APIURL);
 	const res = await fetch(APIURL, {

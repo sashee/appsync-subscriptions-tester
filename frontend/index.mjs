@@ -2,6 +2,8 @@ import ReactDOM from "react-dom";
 import htm from "htm";
 import React, {useState} from "react";
 import {Door} from "./door.mjs";
+import {Temperature} from "./temperature.mjs";
+import {Badges} from "./badges.mjs";
 
 const html = htm.bind(React.createElement);
 
@@ -24,6 +26,12 @@ export const App = () => {
 			<div>
 			${active === "door" && html`
 				<${Door}/>
+			`}
+			${active === "temperature" && html`
+				<${Temperature}/>
+			`}
+			${active === "badges" && html`
+				<${Badges}/>
 			`}
 			</div>
 		</div>`;

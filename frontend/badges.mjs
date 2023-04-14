@@ -205,6 +205,14 @@ export const Badges = () => {
 
 	return html`
 		<div class="container">
+			<details class="mb-5">
+				<summary>Usage</summary>
+				<p class="mt-2">This page shows the real-time status of visitor badges. Each badge is issued at some time, it registers the number of times it is used, and its lifecycle ends when it is returned.</p>
+				<p>The table shows all active badges and those that were returned since the page was opened. Returned ones are not updated anymore and are shown with a gray background.</p>
+				<p>The "ground truth" is a periodic fetch to the database that returns all active badges. This mechanism makes it easy to check if the real-time channel returns all items and updates.</p>
+				<p>The lighter values in the "Uses" and the "Last updated" columns show the ground truth values. If those values are older, the cells have a blue background. The next periodic fetch will make these value up-to-date. If the values from the real-time channel are older then the cells are red. This means the channel missed some updates. It can happen if the channel is offline when the update happened and should be updated once the connection is reestablished.</p>
+				<p>The connection is terminated from time to time and it reconnects after 15 seconds. That means it might miss some updates. A reconnect mechanism makes a fetch in this case so that the data is always up-to-date.</p>
+			</details>
 			<div class="row">
 				<div class="">
 					<div class="card">

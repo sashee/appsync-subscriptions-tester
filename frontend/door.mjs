@@ -107,6 +107,12 @@ export const Door = () => {
 
 	return html`
 		<div class="container">
+			<details class="mb-5">
+				<summary>Usage</summary>
+				<p class="mt-2">This page shows the real-time status of a door. It can be either opened or closed and it can change every 10 seconds.</p>
+				<p>The box on the left shows the status of the real-time connection to an AppSync API. On the right is the "ground truth", data fetched every 5 seconds. With this, it's easy to compare with the real-time channel.</p>
+				<p>The connection is terminated from time to time and it reconnects after 15 seconds. That means it might miss some updates. A reconnect mechanism makes a fetch in this case so that the data is always up-to-date.</p>
+			</details>
 			<div class="row">
 				<div class="col-md-4 offset-md-1">
 					<div class="card">

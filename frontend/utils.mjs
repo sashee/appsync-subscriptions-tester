@@ -1,4 +1,4 @@
-import { appsyncRealtime, persistentSubscription } from "./lib.mjs";
+import { appsyncRealtime, persistentSubscription } from "appsync-subscription-observable";
 import {Observable, NEVER, ReplaySubject, pipe, timer} from "rxjs";
 
 const {APIKEY, APIURL} = window;

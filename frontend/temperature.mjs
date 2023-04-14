@@ -189,6 +189,14 @@ export const Temperature = () => {
 
 	return html`
 		<div class="container">
+			<details class="mb-5">
+				<summary>Usage</summary>
+				<p class="mt-2">This page shows the real-time values of a temperature sensor. It sends a measurement every 10 seconds.</p>
+				<p>The box on the left shows the status of the real-time connection to an AppSync API. On the right is the "ground truth", data fetched every 5 seconds.</p>
+				<p>The top chart is updated only with the latest temperature value. This means if it misses some values, there will be gaps. The bottom chart shows all values for the last 5 minutes</p>
+				<p>The connection is terminated from time to time and it reconnects after 15 seconds. That means it might miss some updates. A reconnect mechanism makes a fetch in this case so that the data is always up-to-date.</p>
+				<p>Due to the different timing of the two boxes, it is possible that the "ground truth" does not show a value that already appears on the left. After the next update, the value should appear.</p>
+			</details>
 			<div class="row">
 				<div class="col-md-4 offset-md-1">
 					<div class="card">
